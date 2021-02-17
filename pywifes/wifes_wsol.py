@@ -233,14 +233,17 @@ def weighted_loggauss_arc_fit(subbed_arc_data,
                               peak_centers,
                               width_guess,
                               find_method = 'mpfit',
-                              multithread = True):
+                              multithread=False):
+
     N = len(subbed_arc_data)
     x = numpy.arange(N,dtype='d')
     y = subbed_arc_data
     narc = len(peak_centers)
     fitted_centers = []
+
     # So, Fred's update (via mpfit) is very much slower ... :-(
     # To make things better, let's do some multiprocessing ...
+
     if find_method == 'loggauss': #Mike C.'s original code using log(gaussian)
         for i in range(narc):
             curr_ctr_guess = peak_centers[i]
@@ -271,15 +274,16 @@ def weighted_loggauss_arc_fit(subbed_arc_data,
             else:
                 fitted_centers.append(new_xctr)
         # return desired values, for now only care about centers
+
     elif find_method =='mpfit' or find_method =='least_squares':
         # Fred's update : fitting a log(gaussian) fails miserably if other
         # lines are close-by (not even blended !).
         # Do an mpfit with gaussian function instead (can limit width!)
         # Use multicore to speed things up
         # Mike I : change in a minimal way to use scipy least squares.
-        if multithread :
+        if multithread:
             cpu = None
-        else :
+        else:
             cpu = 1
         # list the jobs
         jobs = []
@@ -296,12 +300,14 @@ def weighted_loggauss_arc_fit(subbed_arc_data,
                 fitted_centers[i] = float('nan')
                 continue
             jobs.append( (i,curr_ctr_guess, width_guess, xfit, yfit) )
-        if len(jobs)>0:
+
+        if len(jobs) > 0:
             # Do the threading (see below and http://stackoverflow.com/a/3843313)
             # MJI: with the following test, the code ran faster, but even just the Pool(cpu)
             # command slowed things down.
             #jobs2 = [jobs[:len(jobs)//4], jobs[len(jobs)//4:2*len(jobs)//4],jobs[2*len(jobs)//4:3*len(jobs)//4],jobs[3*len(jobs)//4:]]
             #results = mypool.imap_unordered(utils.lsq_gauss_line,jobs2)
+
             if multithread:
                 with multiprocessing.Pool(cpu) as mypool:
                     #start = datetime.datetime.now() #!!! MJI
@@ -468,7 +474,7 @@ def find_lines_and_guess_refs(slitlet_data,
                               yzp=0,
                               flux_threshold_nsig=3.0,
                               deriv_threshold_nsig=1.0,
-                              multithread = True,
+                              multithread=False,
                               plot=False):
     #-----------------------------------
     # get arclines
@@ -648,16 +654,22 @@ def find_lines_and_guess_refs(slitlet_data,
                 jobs.append( (chosen_slitlet,i,ncols,row_inds,
                               init_x_array[row_inds],ref_arc,
                               [best_stretch], False, verbose) )
-        if multithread :
+        if multithread:
             cpu = None
-        else :
+        else:
             cpu = 1
         if verbose :
             print('  ... assign lambdas using up to %d cpu(s) ...' % multiprocessing.cpu_count())
+
+
+
+        """
         mypool = multiprocessing.Pool(cpu)
-        results = mypool.imap_unordered(xcorr_shift_all,jobs)
+        results = mypool.imap_unordered(xcorr_shift_all, jobs)
         mypool.close()
         mypool.join()
+        """
+        results = [xcorr_shift_all(j) for j in jobs]
 
         # All done ! Now, let's collect the results ...
         # Careful, the order may be random ... !
@@ -1556,7 +1568,7 @@ def derive_wifes_optical_wave_solution(inimg,
                                        doplot=False,
                                        savefigs=False,
                                        save_prefix='wsol_',
-                                       multithread=True):
+                                       multithread=False):
   """ The main user-callable function that performs the fit"""
   #------------------------------------------------------
   # *** Mike's edits: operate on PyWiFeS MEF files ***

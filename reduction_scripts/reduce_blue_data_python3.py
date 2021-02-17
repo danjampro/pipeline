@@ -13,8 +13,9 @@ from astropy.io import fits as pyfits
 
 from pywifes import pywifes
 from pywifes.wifes_wsol import derive_wifes_wave_solution
-from pywifies.wifes_calib import calibrate_wifes_cube
-from pywifies.wifes_calib import apply_wifes_telluric
+from pywifes.wifes_calib import calibrate_wifes_cube
+from pywifes.wifes_calib import apply_wifes_telluric
+from pywifes.lacosmic import lacos_wifes
 
 MODE = 0
 
@@ -216,11 +217,7 @@ flat_resp_fn     = '%s_resp_mef.fits' % calib_prefix
 calib_fn         = '%s_calib.pkl' % calib_prefix
 tellcorr_fn      = '%s_tellcorr.pkl' % calib_prefix
 
-#------------------------------------------------------------------------
-#------------------------------------------------------------------------
-# DEFINE THE PROCESSING STEPS
 
-#------------------------------------------------------
 # Subtract overscan
 def run_overscan_sub(metadata, prev_suffix, curr_suffix):
     full_obs_list = get_full_obs_list(metadata)
@@ -236,12 +233,12 @@ def run_overscan_sub(metadata, prev_suffix, curr_suffix):
         pywifes.subtract_overscan(in_fn, out_fn, data_hdu=my_data_hdu)
     return
 
-#------------------------------------------------------
+
 # repair bad pixels!
 def run_bpm_repair(metadata, prev_suffix, curr_suffix):
     full_obs_list = get_full_obs_list(metadata)
     for fn in full_obs_list:
-        in_fn  = os.path.join(out_dir, '%s.p%s.fits' % (fn, prev_suffix))
+        in_fn = os.path.join(out_dir, '%s.p%s.fits' % (fn, prev_suffix))
         out_fn = os.path.join(out_dir, '%s.p%s.fits' % (fn, curr_suffix))
         if skip_done and os.path.isfile(out_fn):
             continue
@@ -504,7 +501,6 @@ def run_wire_soln(metadata, prev_suffix, curr_suffix):
 # Cosmic Rays
 def run_cosmic_rays(metadata, prev_suffix, curr_suffix,
                     ns=False, multithread=False):
-    from lacosmic import lacos_wifes
     # now run ONLY ON SCIENCE TARGETS AND STANDARDS
     sci_obs_list  = get_sci_obs_list(metadata)
     sky_obs_list  = get_sky_obs_list(metadata)
