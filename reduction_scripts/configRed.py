@@ -8,32 +8,27 @@ Processing steps:
 (4) Extract objects (e.g. process_stellar).
 (5) Cleanup.
 """
-
 import os
-import sys
 
-#------------------------------------------------------------------------
-#------------------------------------------------------------------------
-# root needed only for output
-#output_root = "/priv/mulga2/arains/ys/wifes/reduced/"
-output_root = '/priv/mulga1/marusa/2m3reduced/wifes/'
+input_root = os.environ["WIFES_DATA_INPUT"]
+output_root = os.environ["WIFES_DATA_OUTPUT"]
 
 # Do you want to reduce only specific objects? Names must match those in the fits file headers (OBJNAME).
-objectnames=None
-exclude_objectnames=['PDS 70', 'TW Hya']
+objectnames = None
+exclude_objectnames = []
 
 # Do you want to reduce only images with specific binning?
-ccdsum=None #'1 1' # '1 2' # binning; False or None
-naxis2=None #2056 # False # 2056 for PDS 70
+ccdsum = None  # '1 1' # '1 2' # binning; False or None
+naxis2 = None  # 2056 # False # 2056 for PDS 70
 
 # Save to folders with this prefix
-prefix=None#'ys'
+prefix = None #'ys'
 
 # This thing with metadata_filename is actually not used yet.
 if prefix is not None and len(prefix)>0:
-    metadata_filename='%s_metadata'%prefix
+    metadata_filename = '%s_metadata' % prefix
 else:
-    metadata_filename='metadata'
+    metadata_filename = 'metadata'
 
 #------------------------------------------------------------------------
 
@@ -71,25 +66,25 @@ proc_steps = [
     {'step':'bpm_repair'     , 'run':True, 'suffix':'01', 'args':{}},
     #------------------
     {'step':'superbias'      , 'run':True, 'suffix':None,
-     'args':{'method':'row_med', 
-             'plot':False, 
+     'args':{'method':'row_med',
+             'plot':False,
              'verbose':False}},
     {'step':'bias_sub'       , 'run':True, 'suffix':'02',
-     'args':{'method':'subtract', 
-             'plot':False, 
+     'args':{'method':'subtract',
+             'plot':False,
              'verbose':False}},
     #------------------
     {'step':'superflat'      , 'run':True, 'suffix':None,
      'args':{'source':'dome'}},
 #~ #    {'step':'superflat'      , 'run':False, 'suffix':None,
-#~ #     'args':{'source':'twi', 
+#~ #     'args':{'source':'twi',
 #~ #             'scale':'median_nonzero'}},
     {'step':'slitlet_profile', 'run':True, 'suffix':None, 'args':{}},
     #------------------
     {'step':'flat_cleanup'   , 'run':True, 'suffix':None,
-     #~ 'args':{'type':['dome','twi'], 
-     'args':{'type':['dome'], 
-             'verbose':True, 
+     #~ 'args':{'type':['dome','twi'],
+     'args':{'type':['dome'],
+             'verbose':True,
              'plot':False,
              'buffer':4,
              'offsets':[0.4,0.4],
@@ -119,7 +114,7 @@ proc_steps = [
      'args':{'mode':'dome'}},
     #------------------
     {'step':'cosmic_rays'    , 'run':True, 'suffix':'04',
-     'args':{'ns':False, 
+     'args':{'ns':False,
              'multithread':multithread}},
     #------------------
     {'step':'sky_sub'        , 'run':True, 'suffix':'05',
@@ -129,16 +124,16 @@ proc_steps = [
      'args':{'method':'sum'}},
     #------------------
     {'step':'flatfield'      , 'run':True, 'suffix':'07', 'args':{}},
-    #------------------             
+    #------------------
     {'step':'cube_gen'       , 'run':True, 'suffix':'08',
      'args':{'multithread':multithread,
              'adr':True,
              'dw_set': (0.44 if band=='r' else 0.77),
-             'wmin_set': (5400.0 if band=='r' else 3500.0), 
-             'wmax_set': (7000.0 if band=='r' else 5700.0)}},     
+             'wmin_set': (5400.0 if band=='r' else 3500.0),
+             'wmax_set': (7000.0 if band=='r' else 5700.0)}},
     #------------------
     {'step':'extract_stars'  , 'run':True, 'suffix':None,
-     'args':{'ytrim':4, 
+     'args':{'ytrim':4,
              'type':'flux'}},
     {'step':'derive_calib'   , 'run':True, 'suffix':None,
      'args':{'plot_stars':True,
@@ -150,7 +145,7 @@ proc_steps = [
     {'step':'flux_calib'     , 'run':True, 'suffix':'09', 'args':{}},
     #------------------
     {'step':'extract_stars'  , 'run':True, 'suffix':None,
-     'args':{'ytrim':4, 
+     'args':{'ytrim':4,
              'type':'telluric'}},
     {'step':'derive_telluric', 'run':True, 'suffix':None,
      'args':{'plot':True}},

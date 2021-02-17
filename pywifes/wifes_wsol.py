@@ -6,19 +6,19 @@ import pylab
 import pickle
 import scipy.interpolate
 import scipy.optimize
-from wifes_metadata import metadata_dir
-import mpfit
-import optical_model as om
 import math
-import mpfit
 import multiprocessing
 from itertools import cycle
-from wifes_metadata import __version__
 import scipy.optimize as op
 # Fred's upadate (wsol)
 import os
 import datetime
-#import utils #MJI Testing 
+#import utils #MJI Testing
+
+from pywifes import mpfit
+from pywifes.wifes_metadata import metadata_dir
+from pywifes import optical_model as om
+from pywifes.wifes_metadata import __version__
 
 #------------------------------------------------------------------------
 f0 = open(os.path.join(metadata_dir,'basic_wifes_metadata.pkl'), 'rb')
@@ -159,12 +159,12 @@ def gauss_line_resid(p,x,y, gain=None, rnoise=10.0):
 def lsq_gauss_line( args ):
     """
     Fit a Gaussian to data y(x)
-    
+
     Parameters
     ----------
     args: tuple
         nline, guess_center, width_guess, xfit, yfit
-    
+
     Notes
     -----
     nline: int
@@ -175,7 +175,7 @@ def lsq_gauss_line( args ):
     fit = op.least_squares(gauss_line_resid, [numpy.max(args[4]), args[1], args[2]], method='lm', \
             xtol=1e-04, ftol=1e-4, f_scale=[3.,1.,1.], args=(args[3], args[4]))
     #Look for unphysical solutions
-    if (fit.x[2]<0.5) or (fit.x[2]>10) or (fit.x[1]<args[3][0]) or (fit.x[1]>args[3][-1]): 
+    if (fit.x[2]<0.5) or (fit.x[2]>10) or (fit.x[1]<args[3][0]) or (fit.x[1]>args[3][-1]):
         return args[0], float('nan'), 0., fit.x[2], 0.
     else:
         cov = numpy.linalg.inv(fit.jac.T.dot(fit.jac))
@@ -196,17 +196,17 @@ def mpfit_gauss_line( packaged_args ):
     (nline, guess_center, width_guess, xfit, yfit) = packaged_args
     # choose x,y subregions for this line
     fa = {'x':xfit, 'y':yfit}
-    parinfo = [{'value':yfit[xfit==guess_center], 'fixed':0, 
+    parinfo = [{'value':yfit[xfit==guess_center], 'fixed':0,
                 'limited':[1,0], 'limits':[0.,0.]},
-               {'value':guess_center, 'fixed':0, 
-                'limited':[1,1], 
+               {'value':guess_center, 'fixed':0,
+                'limited':[1,1],
                 'limits':[guess_center-width_guess,
                           guess_center+width_guess]},
-               {'value':width_guess/2., 'fixed':0, 
+               {'value':width_guess/2., 'fixed':0,
                 'limited':[1,1], 'limits':[width_guess/20.,width_guess]},
                ]
 
-    my_fit = mpfit.mpfit(err_gauss_line,functkw=fa, parinfo=parinfo, 
+    my_fit = mpfit.mpfit(err_gauss_line,functkw=fa, parinfo=parinfo,
                              quiet=True)
     p1 = my_fit.params
     #print p1, my_fit.status
@@ -233,7 +233,7 @@ def weighted_loggauss_arc_fit(subbed_arc_data,
                               peak_centers,
                               width_guess,
                               find_method = 'mpfit',
-                              multithread = True): 
+                              multithread = True):
     N = len(subbed_arc_data)
     x = numpy.arange(N,dtype='d')
     y = subbed_arc_data
@@ -272,15 +272,15 @@ def weighted_loggauss_arc_fit(subbed_arc_data,
                 fitted_centers.append(new_xctr)
         # return desired values, for now only care about centers
     elif find_method =='mpfit' or find_method =='least_squares':
-        # Fred's update : fitting a log(gaussian) fails miserably if other 
-        # lines are close-by (not even blended !). 
+        # Fred's update : fitting a log(gaussian) fails miserably if other
+        # lines are close-by (not even blended !).
         # Do an mpfit with gaussian function instead (can limit width!)
         # Use multicore to speed things up
         # Mike I : change in a minimal way to use scipy least squares.
         if multithread :
             cpu = None
         else :
-            cpu = 1 
+            cpu = 1
         # list the jobs
         jobs = []
         fitted_centers = numpy.zeros_like(peak_centers, dtype = numpy.float)
@@ -299,22 +299,22 @@ def weighted_loggauss_arc_fit(subbed_arc_data,
         if len(jobs)>0:
             # Do the threading (see below and http://stackoverflow.com/a/3843313)
             # MJI: with the following test, the code ran faster, but even just the Pool(cpu)
-            # command slowed things down. 
+            # command slowed things down.
             #jobs2 = [jobs[:len(jobs)//4], jobs[len(jobs)//4:2*len(jobs)//4],jobs[2*len(jobs)//4:3*len(jobs)//4],jobs[3*len(jobs)//4:]]
             #results = mypool.imap_unordered(utils.lsq_gauss_line,jobs2)
-            if multithread: 
+            if multithread:
                 with multiprocessing.Pool(cpu) as mypool:
                     #start = datetime.datetime.now() #!!! MJI
                     if find_method =='mpfit':
                         results = mypool.imap_unordered(mpfit_gauss_line,jobs)
                     else:
                         results = mypool.imap_unordered(lsq_gauss_line,jobs)
-                        
+
                     # Close off the pool now that we're done with it
                     # !!!MJI Not needed with the "with" command. The iterator below
                     # waits for completion.
                     #mypool.close()
-                    #mypool.join()            
+                    #mypool.join()
                     # Process the results
                     for r in results:
                         #for r in rr:
@@ -382,7 +382,7 @@ def quick_arcline_fit(arc_data,
     full_diffs[:-1] = ind_diffs
     potential_line_inds = init_inds[
         numpy.nonzero(ind_diffs != 1)[0]]
-    
+
     # Fred's update (wsol)
     # Ok, so roughly the same lines will be selected in each row.
     # 30-50% are rubbsih ... so, if we do it once, we could avoid to do it
@@ -396,8 +396,8 @@ def quick_arcline_fit(arc_data,
             prev_lines[int(j)] = 1.
         for j in potential_line_inds:
             curr_lines[int(j)] = 1.
-            
-        corr_out = numpy.correlate(prev_lines,curr_lines, 
+
+        corr_out = numpy.correlate(prev_lines,curr_lines,
                                    mode='full')
         shift = (numpy.where(corr_out == numpy.max(corr_out))[0] - N)[0]+1
         # Given the best shift, just select the lines that we could fit with mpfit previously !
@@ -413,7 +413,7 @@ def quick_arcline_fit(arc_data,
                 checked_ones = numpy.append(checked_ones,[j])
 
         potential_line_inds = numpy.array(checked_ones)
-    
+
     # fit the centers, make sure it didn't fit noise
     next_ctrs = weighted_loggauss_arc_fit(arc_data,
                                           potential_line_inds,
@@ -595,7 +595,7 @@ def find_lines_and_guess_refs(slitlet_data,
                 mean_wshift))
     #---------
     # full xcorr version
-    elif shift_method == 'xcorr_all':  
+    elif shift_method == 'xcorr_all':
         # Fred's update (wsol)
         # First, load the initial guess - currently, only for:
         # B3000, R3000, R7000 with NeAr lamp
@@ -608,7 +608,7 @@ def find_lines_and_guess_refs(slitlet_data,
                               'arclines.'+grating+'.'+arc_name+'.txt')
         if os.path.exists(ref_fn) :
             ref_arc = numpy.loadtxt(ref_fn,skiprows=1)
-        else : 
+        else :
             print(' Ref. file for the current arc lamp + grating unavailable.')
 
         # Create the storage array for the reference wavelength
@@ -618,24 +618,24 @@ def find_lines_and_guess_refs(slitlet_data,
         f = open(ref_fn,'r')
         if 'Channel' in f.readline() and 'B' in grating:
             ref_arc[:,0]= ncols - ref_arc[:,0]
-        f.close() 
+        f.close()
 
         # Loop through each row (each spectrum of the slice)
         # It is slow, so, I use the multiprocessing package to speed things up
         # Package is installed by default for Python v.2.6 and above.
         # I use the 'Pool' concept - check automatically the number of CPU
-        # available. No need to set mutlithread at all ! 
+        # available. No need to set mutlithread at all !
         # Some quick tests showed that the 'Pool' approach is much faster than
-        # simply pilling up many 'Process' ... 
+        # simply pilling up many 'Process' ...
         #
         # Fred, 04.2013
 
         # Stretch value is not varying much over 1 slice.
-        # So, get it in the middle, and use it throughout. 
+        # So, get it in the middle, and use it throughout.
         # Gain some ~6.3 sec per slice by doing this !
         mid_row = numpy.int(nrows/2)
         mid_row_ind = (init_y_array == mid_row)
-        best_stretch = xcorr_shift_all( (chosen_slitlet, 
+        best_stretch = xcorr_shift_all( (chosen_slitlet,
                                        mid_row,ncols,mid_row_ind,
                                        init_x_array[mid_row_ind],
                                        ref_arc,None, True,
@@ -644,9 +644,9 @@ def find_lines_and_guess_refs(slitlet_data,
         for i in range(nrows):
             row_inds = (init_y_array == i+1)
             # only use rows where enough lines are found
-            if len(init_x_array[row_inds]) >= 0.5*len(ref_arc[:,0]):    
+            if len(init_x_array[row_inds]) >= 0.5*len(ref_arc[:,0]):
                 jobs.append( (chosen_slitlet,i,ncols,row_inds,
-                              init_x_array[row_inds],ref_arc, 
+                              init_x_array[row_inds],ref_arc,
                               [best_stretch], False, verbose) )
         if multithread :
             cpu = None
@@ -674,13 +674,13 @@ def find_lines_and_guess_refs(slitlet_data,
         iter_x_array = init_x_array[good_inds]
         iter_y_array = init_y_array[good_inds]
         iter_ref_array = ref_array[good_inds]
-        
+
         if plot :
-            plot_detected_lines(chosen_slitlet, iter_x_array, 
+            plot_detected_lines(chosen_slitlet, iter_x_array,
                                 iter_y_array, iter_ref_array, ncols)
-        
+
         return  iter_x_array,iter_y_array, iter_ref_array
-            
+
     #---------
     else:
         raise ValueError('Xcorr shift method not recognized.')
@@ -704,7 +704,7 @@ def find_lines_and_guess_refs(slitlet_data,
     iter_y_array   = start_full_y_array[iter0_good_inds]
 
     if plot :
-        plot_detected_lines(chosen_slitlet, iter_x_array, iter_y_array, 
+        plot_detected_lines(chosen_slitlet, iter_x_array, iter_y_array,
                             iter_ref_array,ncols)
 
     return iter_x_array, iter_y_array, iter_ref_array
@@ -854,7 +854,7 @@ def xcorr_shift_all( packaged_args ):
 
     corrs = numpy.zeros_like(stretches)
     shifts = numpy.zeros_like(stretches)
-    # Try different 'stretch and shift values to match the 
+    # Try different 'stretch and shift values to match the
     # reference line position. This can be approximative, but not too much !
     for (k,stretch) in enumerate(stretches):
         # Create stretched, temporary "spectrum"
@@ -869,22 +869,22 @@ def xcorr_shift_all( packaged_args ):
         # Cross-correlate pseudo-ref spectrum with real arc lines
         corr_out = numpy.correlate(pseudo_x_obs,pseudo_x_bes, mode='full')
         corrs[k] = numpy.max(corr_out)
-        shifts[k] = numpy.argmax(corr_out)       
+        shifts[k] = numpy.argmax(corr_out)
         #pylab.plot(pseudo_x_obs,'ko-', markerfacecolor='w')
         #pylab.plot(pseudo_x_bes,'r-')
         #pylab.show()
 
         #pylab.plot(stretches,corrs, 'k.-')
         #pylab.show()
-      
+
     # Find best shift and stretch based on X correlation results
     best_shift = int(shifts[numpy.argmax(corrs)])
     best_stretch = stretches[numpy.argmax(corrs)]
-    
+
     # Just get the best stretch and return, or keep going.
     if get_stretch:
         return best_stretch
-    
+
     #if verbose :
     #    print '   row:',this_row+1,\
     #        'best_shift/stretch:',best_shift,best_stretch
@@ -896,7 +896,7 @@ def xcorr_shift_all( packaged_args ):
     final_x_bes = numpy.zeros(ncols)
     pseudo_lam_bes = numpy.zeros(ncols)
     final_lam_bes = numpy.zeros(ncols)
-         
+
     # re-create best matching pseudo reference spectrum
     for j in this_init_x_array:
         pseudo_x_obs[int(j)]=1.
@@ -915,9 +915,9 @@ def xcorr_shift_all( packaged_args ):
                 pseudo_x_bes[0:-(best_shift-ncols)]
             final_lam_bes[best_shift-ncols:] = \
                 pseudo_lam_bes[0:-(best_shift-ncols)]
-     
-    # Make sure there are no other line within 10 Angstroem 
-    # on either side ... should maybe be a parameter ...    
+
+    # Make sure there are no other line within 10 Angstroem
+    # on either side ... should maybe be a parameter ...
     this_ref_array = numpy.zeros_like(this_init_x_array)
     for (j,item) in enumerate(this_init_x_array):
         if j > 0 :
@@ -930,7 +930,7 @@ def xcorr_shift_all( packaged_args ):
                                       - 10)
         else :
             cond2 = True
-        # Finally, associate each identified line 
+        # Finally, associate each identified line
         # with appropriate wavelength.
         if cond1 and cond2 :
             loc = int(numpy.where(x_obs == item)[0])
@@ -1032,7 +1032,7 @@ def slitlet_wsol(slitlet_data,
         init_x_array*bin_x, init_y_array*bin_y,
         chosen_slitlet, grating)
     temp_wave_array = (
-        best_stretch*init_wguess + 
+        best_stretch*init_wguess +
         shift_coeffs[1] +
         shift_coeffs[0]*(init_y_array-1))
     #print numpy.mean(temp_wave_array - init_wguess)
@@ -1615,7 +1615,7 @@ def derive_wifes_optical_wave_solution(inimg,
       if doplot == True or (doplot != False) and (('step2' in doplot)):
           step2plot = True
       else:
-          step2plot = False    
+          step2plot = False
 
       # guess the reference wavelengths
       new_x, new_y, new_r = find_lines_and_guess_refs(

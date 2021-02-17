@@ -5,20 +5,26 @@ import pickle
 import scipy.interpolate
 import multiprocessing
 import subprocess
-from wifes_metadata import metadata_dir
-from wifes_imtrans import blkrep, blkavg, transform_data, detransform_data
 import gc
-import mpfit
 import sys
 import os
 import scipy.ndimage as ndimage
 import scipy.interpolate as interp
 import pylab
-import pdb
 import matplotlib.pyplot as plt
 
-# CODE VERSION
-from wifes_metadata import __version__
+from pywifes import mpfit
+from pywifes.wifes_metadata import metadata_dir
+from pywifes.wifes_imtrans import transform_data, detransform_data
+from pywifes.wifes_wsol import fit_wsol_poly, evaluate_wsol_poly
+from pywifes.wifes_adr import ha_degrees
+from pywifes.wifes_adr import dec_dms2dd
+from pywifes.wifes_adr import adr_x_y
+from pywifes.wifes_calib import derive_wifes_calibration
+from pywifes.wifes_calib import extract_wifes_stdstar
+from pywifes.wifes_calib import derive_wifes_telluric
+from pywifes.wifes_calib import load_wifes_cube
+from pywifes.wifes_metadata import __version__
 
 #------------------------------------------------------------------------
 # NEED TO OPEN / ACCESS WIFES METADATA FILE!!
@@ -927,7 +933,7 @@ def fit_wifes_interslit_bias(inimg,
         ny, nx = numpy.shape(curr_data)
         linx = numpy.arange(nx, dtype='d')
         liny = numpy.arange(ny, dtype='d')
-        full_x, full_y = numpy.meshgrid(linx, liny)        
+        full_x, full_y = numpy.meshgrid(linx, liny)
         if method == 'row_med':
             #ny, nx = numpy.shape(curr_data)
             row_med = numpy.zeros(nx, dtype='d')
@@ -952,7 +958,6 @@ def fit_wifes_interslit_bias(inimg,
             fit_x = full_x[curr_inds].flatten()
             fit_y = full_y[curr_inds].flatten()
             fit_b = curr_data[curr_inds].flatten()
-            from wifes_wsol import fit_wsol_poly, evaluate_wsol_poly
             init_x_poly, init_y_poly = fit_wsol_poly(fit_x, fit_y, fit_b,
                                                      x_polydeg, y_polydeg)
             init_bias_fvals = evaluate_wsol_poly(
@@ -1125,9 +1130,9 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
 
     # method == fit :
     # for each region, fit the bias structure
-    # It is time consuming to fit the whole 2D structure of the bias. 
+    # It is time consuming to fit the whole 2D structure of the bias.
     # Instead, I collapse it along the y-direction and fit it.
-    # It's (much) faster, and accurate enough. 
+    # It's (much) faster, and accurate enough.
     # method == row_med :
     # This is faster still, and as accurate. No fitting required, we just collapsed
     # the bias, and take the mean after rejecting outliers. Should be the default,
@@ -1137,7 +1142,7 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
     for i in range(len(sci_regs)):
         reg = sci_regs[i]
         curr_data = orig_data[reg[0]:reg[1]+1,reg[2]:reg[3]+1]
-    
+
         ny, nx = numpy.shape(curr_data)
         linx = numpy.arange(nx, dtype='d')
         liny = numpy.arange(ny, dtype='d')
@@ -1157,7 +1162,7 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
            bias_sub = row_med**numpy.ones(
                numpy.shape(curr_data), dtype='d')
            # Fred's update (bias fit) ------
-           # To remove the variations (some at least) along the 
+           # To remove the variations (some at least) along the
            # y-direction, let's smooth the residuals !
            residual = curr_data - bias_sub
            residual[numpy.where(residual>150)]=0.0 # remove 'CR'
@@ -1172,11 +1177,11 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
 
             if camera == 'WiFeSRed' :
                 p0 = [0.,1., -200.,4100., 1., 20.,-800., 0.0001]
-                fa = {'x': linx, 'z':curr_data.mean(axis=0), 
+                fa = {'x': linx, 'z':curr_data.mean(axis=0),
                       'err':curr_data.std(axis=0), 'camera':camera }
                 constraints = [{'limited':[0,0]},
                                {'limited':[0,0]},
-                               {'limited':[0,0]},            
+                               {'limited':[0,0]},
                                {'limited':[1,0], 'limits':[numpy.max(full_x[0,:]),0]},
                                {'limited':[0,0]},
                                {'limited':[0,0]},
@@ -1186,11 +1191,11 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
 
             else :
                 p0 = [-3.,5., -500.,4100., 0.0001, 200.,-800., 0.0001, 1, 0.01,4000.]
-                fa = {'x': linx, 'z':curr_data.mean(axis=0), 
+                fa = {'x': linx, 'z':curr_data.mean(axis=0),
                       'err':curr_data.std(axis=0), 'camera':camera }
                 constraints = [{'limited':[0,0]},
                                {'limited':[0,0]},
-                               {'limited':[0,0]},            
+                               {'limited':[0,0]},
                                {'limited':[1,0], 'limits':[numpy.max(full_x[0,:]),0]},
                                {'limited':[0,0]},
                                {'limited':[0,0]},
@@ -1202,15 +1207,15 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
                                ]
 
             print(' Fitting bias frame %s' % bias_img.split('/')[-1])
-            fit_result = mpfit.mpfit(error_wifes_bias_model, p0, functkw = fa, 
-                                     parinfo = constraints, quiet=not verbose) 
+            fit_result = mpfit.mpfit(error_wifes_bias_model, p0, functkw = fa,
+                                     parinfo = constraints, quiet=not verbose)
             p1 = fit_result.params
             #print p1
             if fit_result.status <= 0 or fit_result.status == 5  :
                 print(' Fit may have failed : mpfit status:',fit_result.status)
                 print("I'll plot this one for sanity check...")
                 plot = True
-    
+
             out_data[reg[0]:reg[1]+1,reg[2]:reg[3]+1] = wifes_bias_model(p1,full_x,
                                                                          camera)
         # Plot for test purposes ...
@@ -1219,7 +1224,7 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
             plt.plot(linx, curr_data.mean(axis=0), 'k-', label='raw bias', lw=2)
             if method == 'row_med':
                 plt.plot(linx, out_data.mean(axis=0),'r-', label = 'row_med bias')
-                plt.plot(linx, curr_data.mean(axis=0) - out_data.mean(axis=0), 'g-', label='residual')       
+                plt.plot(linx, curr_data.mean(axis=0) - out_data.mean(axis=0), 'g-', label='residual')
             if method == 'fit' :
                 plt.plot(linx, curr_data.mean(axis=0) - wifes_bias_model(p1, linx, camera), 'g', label='residual')
                 plt.plot(linx, wifes_bias_model(p1, linx, camera), 'r', label='model fit')
@@ -1232,7 +1237,7 @@ def generate_wifes_bias_fit(bias_img, outimg, data_hdu=0,
             plt.ylim([-10, 10])
             plt.title('Fitting bias frame %s' % bias_img.split('/')[-1])
             plt.show()
-    
+
         # ----------------------------------------------------
     # save it!
     outfits = pyfits.HDUList(f1)
@@ -1439,9 +1444,9 @@ def interslice_cleanup(input_fn, output_fn,
         # better idea anyone ?
         tmp = numpy.zeros_like(data[symin:symax,xmin:xmax])
         median = numpy.median(data[symin:symax,xmin:xmax])
-        std = numpy.std(data[symin:symax,xmin:xmax])        
+        std = numpy.std(data[symin:symax,xmin:xmax])
         tmp[data[symin:symax,xmin:xmax]< (median+nsig_lim*std)] = \
-            data[symin:symax,xmin:xmax][data[symin:symax,xmin:xmax]< 
+            data[symin:symax,xmin:xmax][data[symin:symax,xmin:xmax]<
                                         (median+nsig_lim*std)]
         if method=='2D':
             inter_smooth[symin:symax,xmin:xmax] = \
@@ -1458,7 +1463,7 @@ def interslice_cleanup(input_fn, output_fn,
                     ndimage.gaussian_filter(data[symin:symax,xmin:xmax],
                                             sigma=[radius,radius])
             elif method=='1D':
-                inter_smooth[symin:symax,xmin:xmax] += numpy.median(tmp)                    
+                inter_smooth[symin:symax,xmin:xmax] += numpy.median(tmp)
     #------------------------------------
     # 5) Great, now we can interpolate this and reconstruct the contamination
     # Do each slitlet individually to avoid overloading the memory
@@ -1480,7 +1485,7 @@ def interslice_cleanup(input_fn, output_fn,
             y1 = 1
         else:
             y4 = numpy.round(slitlet_defs[numpy.str(slit-1)][2]//bin_y)
-            y1 = numpy.round(slitlet_defs[numpy.str(slit+1)][3]//bin_y)         
+            y1 = numpy.round(slitlet_defs[numpy.str(slit+1)][3]//bin_y)
         # Select a subsample of point to do the integration
         x = numpy.arange(xmin+3,xmax-3,dx)
         y = numpy.append(numpy.arange(y1+1,y2-1,dy),
@@ -1506,7 +1511,7 @@ def interslice_cleanup(input_fn, output_fn,
     f[0].header.set('PYWIFES', __version__, 'PyWiFeS version')
     f.writeto(output_fn,overwrite=True)
     f.close()
-    if verbose:    
+    if verbose:
         print(' Additive offset:',offset*numpy.mean(fitted))
     # 8) Plot anything ?
     if plot or savefigs:
@@ -1525,7 +1530,7 @@ def interslice_cleanup(input_fn, output_fn,
         if savefigs:
             save_fn = save_prefix+'flat_glow_data.png'
             pylab.savefig(save_fn)
-        #------------------            
+        #------------------
         pylab.figure()
         pylab.imshow(data-fitted+offset*numpy.mean(fitted),vmin=0,
                      vmax=myvmax,cmap='nipy_spectral', origin='lower')
@@ -2433,7 +2438,7 @@ def wifes_illumination(spatial_inimg,
         else:
             spat_flat = (numpy.sum(orig_spat_data, axis=1)
                          /numpy.sum(spatial_flat_spec))
-        spat_flat[numpy.nonzero(spat_flat < resp_min)[0]] = resp_min    
+        spat_flat[numpy.nonzero(spat_flat < resp_min)[0]] = resp_min
         normed_data = (flat_ones.T*spat_flat).T
         outfits[curr_hdu].data = normed_data
         if zero_var:
@@ -2445,11 +2450,6 @@ def wifes_illumination(spatial_inimg,
     f1.close()
     f2.close()
     return
-
-#------------------------------------------------------------------------
-# function to fit the wavelength solution!
-from wifes_wsol import derive_wifes_wave_solution
-from wifes_wsol import derive_wifes_skyline_solution
 
 #------------------------------------------------------------------------
 # function to fit the wire solution!
@@ -2483,13 +2483,13 @@ def derive_wifes_wire_solution(inimg, out_file,
     if halfframe:
         nslits = 12
     else:
-        nslits = 25    
+        nslits = 25
     # figure out which channel it is
     if f[1].header['CAMERA'] == 'WiFeSRed':
         channel = 'red'
         grating = f[1].header['GRATINGR']
     else:
-        channel = 'blue'    
+        channel = 'blue'
         grating = f[1].header['GRATINGB']
     # figure out the binning!
     try:
@@ -2620,10 +2620,6 @@ def generate_wifes_cube(inimg, outimg,
 
 # ------------------- Fred's update (2) -----------------------
 
-from wifes_adr import ha_degrees
-from wifes_adr import dec_dms2dd
-from wifes_adr import adr_x_y
-
 # ------------------- Fred's update (2) -----------------------
 # Now takes into account ADR correction
 # 3D interpolation is hard/slow/impossible. Because of the symmetry of the system
@@ -2683,8 +2679,8 @@ def generate_wifes_cube_oneproc(
         frame_wdisps.append(curr_wdisp)
         #print numpy.shape(f3[i].data)
     if dw_set != None:
-        disp_ave = dw_set 
-    else : 
+        disp_ave = dw_set
+    else :
         disp_ave = numpy.mean(frame_wdisps)
     if verbose:
         print(' Data spectral resolution (min/max):',numpy.round(numpy.min(frame_wdisps),4),numpy.round(numpy.max(frame_wdisps),4))
@@ -2739,10 +2735,10 @@ def generate_wifes_cube_oneproc(
         # telescope PA!
         telpa = numpy.radians(obs_hdr['TELPAN'])
         # THIS SHOULD BE A FIXED VALUE!!
-        #adr_ref = adr_x_y(numpy.array([out_lambda[-1]]),secz, ha, dec, lat, 
+        #adr_ref = adr_x_y(numpy.array([out_lambda[-1]]),secz, ha, dec, lat,
         #                  teltemp = 0.0, telpres=700.0, telpa=telpa)
         adr_ref = adr_x_y(numpy.array([5600.0]),
-                          secz, ha, dec, lat, 
+                          secz, ha, dec, lat,
                           teltemp = 0.0, telpres=700.0, telpa=telpa)
     #---------------------------
     outfits = pyfits.HDUList(f3)
@@ -2781,7 +2777,7 @@ def generate_wifes_cube_oneproc(
         curr_dq_flat   = curr_dq.flatten()
         # Calculate the ADR corrections (this is slow)
         if adr :
-            adr = adr_x_y(wave_flat,secz, ha, dec, lat, teltemp = 0.0, telpres=700.0, 
+            adr = adr_x_y(wave_flat,secz, ha, dec, lat, teltemp = 0.0, telpres=700.0,
                           telpa=telpa)
             adr_y = adr[1]-adr_ref[1]
             all_ypos_flat -= adr_y
@@ -2817,14 +2813,14 @@ def generate_wifes_cube_oneproc(
     if adr :
         # To avoid interpolation issues at the edges,
         # add two extra values on either side (0 in this version).
-        in_x = numpy.arange(-1,nslits+1,1, dtype='d') 
+        in_x = numpy.arange(-1,nslits+1,1, dtype='d')
         out_x = numpy.arange(nslits, dtype='d')
         if verbose:
             print(' -> Step 2: interpolating along x (1D interp.)')
         for i in range(0,nlam) :
             adr = adr_x_y(numpy.array([out_lambda[i]]),
-                          secz,ha,dec,lat, teltemp = 0.0, 
-                          telpres=700.0, 
+                          secz,ha,dec,lat, teltemp = 0.0,
+                          telpres=700.0,
                           telpa=telpa)
             adr_x = adr[0] - adr_ref[0]
             for j in range(0,ny) :
@@ -2846,13 +2842,13 @@ def generate_wifes_cube_oneproc(
                     dq_data_cube_tmp[nslits-1,j,i])
                 # do interpolation
                 f = scipy.interpolate.interp1d(
-                    in_x-adr_x, this_flux, kind='linear', 
+                    in_x-adr_x, this_flux, kind='linear',
                     fill_value=0.0, bounds_error=False)
                 g = scipy.interpolate.interp1d(
-                    in_x-adr_x, this_var, kind='linear', 
+                    in_x-adr_x, this_var, kind='linear',
                     fill_value=0.0, bounds_error=False)
                 h = scipy.interpolate.interp1d(
-                    in_x-adr_x, this_dq, kind='nearest', 
+                    in_x-adr_x, this_dq, kind='nearest',
                     fill_value=3, bounds_error=False)
                 flux_data_cube_tmp[:nslits,j,i] = f(out_x)
                 var_data_cube_tmp[:nslits,j,i] = g(out_x)
@@ -2876,7 +2872,7 @@ def generate_wifes_cube_oneproc(
     outfits[0].header.set('PYWIFES', __version__, 'PyWiFeS version')
     outfits.writeto(outimg, overwrite=True)
     f3.close()
-    return 
+    return
 
 ###--------------------------------------------------------------
 # multithread cube processes
@@ -2964,11 +2960,11 @@ def generate_wifes_cube_multithread(
         final_frame_wmax = min(wmax_set, frame_wmax)
     else:
         final_frame_wmax = frame_wmax
-    
+
     if verbose:
         print(' Data spectral resolution (min/max):',numpy.round(numpy.min(frame_wdisps),4),numpy.round(numpy.max(frame_wdisps),4))
         print(' Cube spectral resolution : ',disp_ave)
-    
+
     out_lambda = numpy.arange(final_frame_wmin, final_frame_wmax, disp_ave)
     # set up output data
     # load in spatial solutions
@@ -3012,10 +3008,10 @@ def generate_wifes_cube_multithread(
         # telescope PA!
         telpa = numpy.radians(obs_hdr['TELPAN'])
         # THIS MUST BE A FIXED VALUE
-        #adr_ref = adr_x_y(numpy.array([out_lambda[-1]]),secz, ha, dec, lat, 
+        #adr_ref = adr_x_y(numpy.array([out_lambda[-1]]),secz, ha, dec, lat,
         #                  teltemp = 0.0, telpres=700.0, telpa=telpa)
         adr_ref = adr_x_y(numpy.array([5600.0]),
-                          secz, ha, dec, lat, 
+                          secz, ha, dec, lat,
                           teltemp = 0.0, telpres=700.0, telpa=telpa)
     #---------------------------
     if verbose:
@@ -3048,7 +3044,7 @@ def generate_wifes_cube_multithread(
         # for the desired output y-lambda grid
         wave_flat = wave.flatten()
         all_ypos_flat = all_ypos.flatten()
-    
+
         # Calculate the ADR corrections (this is slow)
         if adr :
             adr = adr_x_y(wave_flat,secz, ha, dec, lat, teltemp = 0.0,
@@ -3144,14 +3140,14 @@ def generate_wifes_cube_multithread(
     if adr :
         # To avoid interpolation issues at the edges,
         # add two extra values on either side (0 in this version).
-        in_x = numpy.arange(-1,nslits+1,1, dtype='d') 
+        in_x = numpy.arange(-1,nslits+1,1, dtype='d')
         out_x = numpy.arange(nslits, dtype='d')
         if verbose:
             print(' -> Step 2: interpolating along x (1D interp.)')
         for i in range(0,nlam) :
             adr = adr_x_y(numpy.array([out_lambda[i]]),
-                          secz,ha,dec,lat, teltemp = 0.0, 
-                          telpres=700.0, 
+                          secz,ha,dec,lat, teltemp = 0.0,
+                          telpres=700.0,
                           telpa=telpa)
             adr_x = adr[0] - adr_ref[0]
             for j in range(0,ny) :
@@ -3173,13 +3169,13 @@ def generate_wifes_cube_multithread(
                     dq_data_cube_tmp[nslits-1,j,i])
                 # do interpolation
                 f = scipy.interpolate.interp1d(
-                    in_x-adr_x, this_flux, kind='linear', 
+                    in_x-adr_x, this_flux, kind='linear',
                     fill_value=0.0, bounds_error=False)
                 g = scipy.interpolate.interp1d(
-                    in_x-adr_x, this_var, kind='linear', 
+                    in_x-adr_x, this_var, kind='linear',
                     fill_value=0.0, bounds_error=False)
                 h = scipy.interpolate.interp1d(
-                    in_x-adr_x, this_dq, kind='nearest', 
+                    in_x-adr_x, this_dq, kind='nearest',
                     fill_value=3, bounds_error=False)
                 flux_data_cube_tmp[:nslits,j,i] = f(out_x)
                 var_data_cube_tmp[:nslits,j,i] = g(out_x)
@@ -3204,16 +3200,10 @@ def generate_wifes_cube_multithread(
     outfits[0].header.set('PYWIFES', __version__, 'PyWiFeS version')
     outfits.writeto(outimg, overwrite=True)
     f3.close()
-    return    
+    return
 
 #------------------------------------------------------------------------
 # scripts to derive a wavelength calibration from standard stars
-from wifes_calib import derive_wifes_calibration
-from wifes_calib import extract_wifes_stdstar
-from wifes_calib import calibrate_wifes_cube
-from wifes_calib import derive_wifes_telluric
-from wifes_calib import apply_wifes_telluric
-from wifes_calib import load_wifes_cube
 
 #------------------------------------------------------------------------
 def generate_wifes_3dcube(inimg, outimg):
@@ -3280,4 +3270,3 @@ def generate_wifes_3dcube(inimg, outimg):
     outfits.writeto(outimg, overwrite=True)
     f.close()
     return
-

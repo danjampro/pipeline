@@ -4,14 +4,14 @@ import pickle
 from astropy.io import fits as pyfits
 import os
 import scipy.interpolate
-import wifes_ephemeris
-from wifes_metadata import metadata_dir
-from wifes_metadata import __version__
+from pywifes import wifes_ephemeris
+from pywifes.wifes_metadata import metadata_dir
+from pywifes.wifes_metadata import __version__
 
 #------------------------------------------------------------------------
 #------------------------------------------------------------------------
 # reference star information!
-stdstar_fn = os.path.join(metadata_dir,'stdstar_lookup_table.dat')
+stdstar_fn = os.path.join(metadata_dir, 'stdstar_lookup_table.dat')
 f1 = open(stdstar_fn, 'r')
 stdstar_lines = f1.readlines()[1:]
 f1.close()
@@ -44,7 +44,7 @@ sso_extinct_interp = scipy.interpolate.interp1d(extinct_data[:,0],
 #------------------------------------------------------------------------
 # high-level function to find nearest standard star for a given frame!
 stdstar_list = list(ref_coords_lookup.keys())
-stdstar_list.sort() 
+stdstar_list.sort()
 nstds = len(stdstar_list)
 stdstar_ra_array  = numpy.zeros(nstds, dtype='d')
 stdstar_dec_array = numpy.zeros(nstds, dtype='d')
@@ -201,7 +201,7 @@ def extract_wifes_stdstar(cube_fn,
     #    std_y = y_ctr*numpy.ones(nlam, dtype='d')
     if x_ctr == None or y_ctr == None:
         cube_im = numpy.sum(obj_cube_data, axis=0)
-        maxind = numpy.nonzero(cube_im == cube_im.max()) 
+        maxind = numpy.nonzero(cube_im == cube_im.max())
         yc = maxind[0][0]
         xc = maxind[1][0]
         std_x = xc*numpy.ones(nlam, dtype='d')
@@ -363,7 +363,7 @@ def savitzky_golay(y, window_size, order, deriv=0, rate=1):
           W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery
           Cambridge University Press ISBN-13: 9780521880688
        """
-        from math import factorial   
+        from math import factorial
         try:
            window_size = numpy.abs(numpy.int(window_size))
            order = numpy.abs(numpy.int(order))
@@ -497,7 +497,7 @@ def derive_wifes_calibration(cube_fn_list,
             pylab.figure()
             pylab.plot(obs_wave, ref_flux, color='b',
                        label='Reference star flux')
-            pylab.plot(obs_wave[good_inds], scaled_flux, color='r', 
+            pylab.plot(obs_wave[good_inds], scaled_flux, color='r',
                        label='Scaled observed flux')
             pylab.title(star_name)
             pylab.xlabel(r'Wavelength [$\AA$]')
@@ -531,9 +531,9 @@ def derive_wifes_calibration(cube_fn_list,
     sort_order = next_full_x.argsort()
     temp_full_x = next_full_x[sort_order]
     temp_full_y = next_full_y[sort_order]
-    # ----------- Fred's update 3 -------------------  
+    # ----------- Fred's update 3 -------------------
     if method == 'smooth_SG':
-        # Savitzky-Golay requires continuous data. ->need to fill the 'holes' 
+        # Savitzky-Golay requires continuous data. ->need to fill the 'holes'
         # It is a problem for red spectra (at this point at least)
         # Check if there are gaps (telluric, Halpha, etc ...)
         init_bad_inds = \
@@ -542,7 +542,7 @@ def derive_wifes_calibration(cube_fn_list,
                            (init_full_y < numpy.median(init_full_y)+20.0)*
                            (telluric_mask(init_full_x))*
                            (halpha_mask(init_full_x))))[0]
-        if len(init_bad_inds) > 0 : 
+        if len(init_bad_inds) > 0 :
             # if yes, first fit a polynomial, then use it to 'fill the gaps.
             temp_calib = numpy.polyfit(temp_full_x, temp_full_y, polydeg)
             temp_fvals = numpy.polyval(temp_calib, init_full_x)
@@ -552,13 +552,13 @@ def derive_wifes_calibration(cube_fn_list,
             # Fails if multiple stars ... need to order the array !
             this_sort_order = temp_full_x.argsort()
             temp_full_x = temp_full_x[this_sort_order]
-            temp_full_y = temp_full_y[this_sort_order]        
+            temp_full_y = temp_full_y[this_sort_order]
         # Then fit SG normally
         temp_fvals = savitzky_golay(temp_full_y,101,1,0)
         excise_cut = 0.003
     else :
         temp_best_calib = numpy.polyfit(temp_full_x, temp_full_y, polydeg)
-        temp_fvals = numpy.polyval(temp_best_calib, temp_full_x) 
+        temp_fvals = numpy.polyval(temp_best_calib, temp_full_x)
     # excise outliers
     final_good_inds = numpy.nonzero(
         numpy.abs(temp_fvals-temp_full_y)/numpy.abs(temp_fvals) < excise_cut)[0]
@@ -576,7 +576,7 @@ def derive_wifes_calibration(cube_fn_list,
         smooth_y = numpy.convolve(smooth_y, numpy.ones((boxcar,))/boxcar, mode='same')[boxcar:-boxcar]
         final_fvals = savitzky_golay(smooth_y,101,1,0)
         this_f = scipy.interpolate.interp1d(
-            smooth_x,final_fvals,bounds_error=False, 
+            smooth_x,final_fvals,bounds_error=False,
             kind='linear')
         all_final_fvals = this_f(init_full_x)
         final_x = full_x
@@ -598,21 +598,21 @@ def derive_wifes_calibration(cube_fn_list,
         # MC update - raw fit on top
         pylab.axes([0.10, 0.35, 0.85, 0.60])
         pylab.plot(temp_full_x, temp_full_y, 'r.',markerfacecolor='none',
-                   markeredgecolor='r', 
+                   markeredgecolor='r',
                    label='Raw sensitivity (initial regions)')
-        pylab.plot(full_x, full_y, color='b', 
+        pylab.plot(full_x, full_y, color='b',
                    label ='Raw sensitivity (valid regions)')
         pylab.plot(temp_full_x,temp_fvals, color=r'#FF6103',
                    lw=2,label='Initial fit')
         if  method == 'smooth_SG':
-            pylab.plot(means[:,0], means[:,1], color='b', 
+            pylab.plot(means[:,0], means[:,1], color='b',
                        label ='Mean sensitivity (valid regions, all stars)')
-            pylab.plot(smooth_x, smooth_y, color=r'#7f007f', 
+            pylab.plot(smooth_x, smooth_y, color=r'#7f007f',
                        label ='Smoothed mean sensitivity')
         else :
-            pylab.plot(full_x, full_y, color='b', 
+            pylab.plot(full_x, full_y, color='b',
                        label ='Raw sensitivity (valid regions)')
-        pylab.plot(full_x, final_fvals, color=r'#00FF00', lw=2, 
+        pylab.plot(full_x, final_fvals, color=r'#00FF00', lw=2,
                    label='Final fit')
         #pylab.hlines(-37.5,numpy.min(full_x),numpy.max(full_x), 'k')
         pylab.xlim([numpy.min(full_x),numpy.max(full_x)])
@@ -635,7 +635,7 @@ def derive_wifes_calibration(cube_fn_list,
             pylab.savefig(save_fn)
     if plot_stars or plot_sensf:
         pylab.show()
-    # Fred's update ... now, careful, because that's dirty ... 
+    # Fred's update ... now, careful, because that's dirty ...
     # the function does not always return the same thing !
     # SAVE IN THE PICKLE FILE THE WAVELENGTH AND CALIB FVAL ARRAYS
     save_calib = {'wave' : final_x,
@@ -687,7 +687,7 @@ def calibrate_wifes_cube(inimg, outimg,
             bounds_error=False,fill_value=-100.0,
             kind='linear')
         all_final_fvals = this_f(wave_array)
-        inst_fcal_array = 10.0**(-0.4*all_final_fvals) 
+        inst_fcal_array = 10.0**(-0.4*all_final_fvals)
         #import pdb
         #pdb.set_trace()
     elif mode == 'iraf':
@@ -722,7 +722,7 @@ def calibrate_wifes_cube(inimg, outimg,
     outfits[0].header.set('PYWIFES', __version__, 'PyWiFeS version')
     outfits.writeto(outimg, overwrite=True)
     f3.close()
-    return  
+    return
 
 #------------------------------------------------------------------------
 # telluric corrections!!!
@@ -844,9 +844,9 @@ def derive_wifes_telluric(cube_fn_list,
             airmass = airmass_list[i]
             wave, O2_ratio = O2_corrections[i]
             H2O_ratio = H2O_corrections[i][1]
-            sp1.plot(wave, O2_ratio**(1.0/(airmass**O2_power)), 
+            sp1.plot(wave, O2_ratio**(1.0/(airmass**O2_power)),
                      label=cube_fn_list[i].split('/')[-1])
-            sp2.plot(wave, H2O_ratio**(1.0/(airmass**H2O_power)), 
+            sp2.plot(wave, H2O_ratio**(1.0/(airmass**H2O_power)),
                      label=cube_fn_list[i].split('/')[-1])
         sp1.set_xlabel(r'Wavelength [$\AA$]')
         sp1.set_title('Individual O2 Telluric Correction functions')
@@ -857,9 +857,9 @@ def derive_wifes_telluric(cube_fn_list,
         sp2.legend(loc='lower left',fancybox=True, shadow=True)
         sp2.set_xlim([numpy.min(base_wave),numpy.max(base_wave)])
         pylab.figure()
-        pylab.plot(base_wave, final_O2_corr, color='r', lw=2, 
+        pylab.plot(base_wave, final_O2_corr, color='r', lw=2,
                    label='Default O2 lines' )
-        pylab.plot(base_wave, final_H2O_corr, color='k', lw=2, 
+        pylab.plot(base_wave, final_H2O_corr, color='k', lw=2,
                    label='Default H2O lines')
         pylab.xlabel(r'Wavelength [$\AA$]')
         pylab.legend(loc='lower left',fancybox=True,shadow=True)
@@ -945,5 +945,3 @@ def apply_wifes_telluric(inimg,
     outfits.writeto(outimg, overwrite=True)
     f3.close()
     return
-
-
