@@ -5,7 +5,7 @@ import multiprocessing
 import scipy.signal
 import scipy.ndimage
 import scipy.interpolate
-from wifes_imtrans import blkrep, blkavg, transform_data, detransform_data
+from pywifes.wifes_imtrans import blkrep, blkavg, transform_data, detransform_data
 
 import warnings
 warnings.simplefilter('ignore', scipy.ComplexWarning)
@@ -51,7 +51,7 @@ def lacos_spec_data(data,
                                 numpy.arange(ny))
     # set up bad pix mask that will persist through multiple iterations
     global_bpm = numpy.zeros(numpy.shape(data))
-    
+
     #------------------------------------------------------------------------
     # MULTIPLE ITERATIONS
     clean_data = 1.0*data
@@ -70,17 +70,17 @@ def lacos_spec_data(data,
             sky_model = detransform_data(med_rect, clean_data, wave)
             m5_model  = detransform_data(m5_rect,  clean_data, wave)
         subbed_data = clean_data - sky_model
-        
+
         #------------------------------------
         # step 2 - subtract object spectra... let's skip this
-        
+
         #------------------------------------
         # step 3 - take 2nd order derivative (laplacian) of input image
         blkdata = blkrep(subbed_data,2,2)
         init_conv_data = scipy.signal.convolve2d(blkdata, laplace_kernel)[1:-1,1:-1]
         init_conv_data[numpy.nonzero(init_conv_data <= 0.0)] = 0.0
         conv_data = blkavg(init_conv_data,2,2)
-        
+
         #------------------------------------
         # step 4 - make noise model, create sigma map
         noise = (1.0/gain) * ((gain*m5_model + rdnoise**2)**0.5)
@@ -97,7 +97,7 @@ def lacos_spec_data(data,
         #pylab.hist(plot_sig.flatten(), bins=1000)
         #pylab.show()
         #print squirrel
-        
+
         #------------------------------------
         # step 5 - identify potential cosmic rays!!!!
         # must be greater than sig_clip*noise and obj_lim*obj_flux
@@ -111,7 +111,7 @@ def lacos_spec_data(data,
             (sigmap/obj_sig > obj_lim))
         new_bpm = numpy.zeros(numpy.shape(subbed_data))
         new_bpm[bad_pix] = 1
-        
+
         #------------------------------------
         # step 6 - identify neighboring pixels that might be CRs
         neighbor_sc = sig_frac*sig_clip
@@ -147,7 +147,7 @@ def lacos_spec_data(data,
         # if no new CRs found, exit loop
         if len(new_bpix[0]) == 0:
             break
-        
+
         #------------------------------------
         # step 7 - interpolate over neighboring pixels to fill the bad CR pix
         all_bpix = numpy.nonzero(global_bpm)
@@ -201,7 +201,7 @@ def lacos_data_savefits(data,
 #-----------------------------------------------------------------------------
 # function for doing LA Cosmic on a wifes MEF file
 def lacos_wifes(inimg, outimg,
-                gain=1.0,       # assume data has been scaled by its gain 
+                gain=1.0,       # assume data has been scaled by its gain
                 rdnoise=5.0,
                 wsol_fn=None,
                 sig_clip = 4.0,
@@ -238,7 +238,7 @@ def lacos_wifes(inimg, outimg,
     return
 
 def lacos_wifes_oneproc(inimg, outimg,
-                        gain=1.0,       # assume data has been scaled by its gain 
+                        gain=1.0,       # assume data has been scaled by its gain
                         rdnoise=5.0,
                         wsol_fn=None,
                         sig_clip = 4.0,
@@ -289,7 +289,7 @@ def lacos_wifes_oneproc(inimg, outimg,
 
 def lacos_wifes_multithread(
     inimg, outimg,
-    gain=1.0,       # assume data has been scaled by its gain 
+    gain=1.0,       # assume data has been scaled by its gain
     rdnoise=5.0,
     wsol_fn=None,
     sig_clip = 4.0,

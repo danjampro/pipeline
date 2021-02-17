@@ -638,18 +638,15 @@ def derive_wifes_calibration(cube_fn_list,
     # Fred's update ... now, careful, because that's dirty ...
     # the function does not always return the same thing !
     # SAVE IN THE PICKLE FILE THE WAVELENGTH AND CALIB FVAL ARRAYS
-    save_calib = {'wave' : final_x,
-                  'cal'  : final_y}
-    f1 = open(calib_out_fn, 'wb')
-    pickle.dump(save_calib, f1)
-    f1.close()
+    save_calib = {'wave': final_x, 'cal': final_y}
+
+    with open(calib_out_fn, 'wb') as f1:
+        pickle.dump(save_calib, f1)
+
     return
 
 #------------------------------------------------------------------------
-def calibrate_wifes_cube(inimg, outimg,
-                         calib_fn,
-                         mode='pywifes',
-                         extinction_fn=None):
+def calibrate_wifes_cube(inimg, outimg, calib_fn,  mode='pywifes', extinction_fn=None):
     # get extinction curve
     if extinction_fn == None:
         extinct_interp = sso_extinct_interp
@@ -671,25 +668,25 @@ def calibrate_wifes_cube(inimg, outimg,
         secz = 1.0
         print('AIRMASS keyword not found, assuming airmass=1.0')
     nlam = numpy.shape(f3[1].data)[1]
-    wave_array = wave0+dwave*numpy.arange(nlam,dtype='d')
+    wave_array = wave0 + dwave * numpy.arange(nlam, dtype='d')
     # calculate the flux calibration array
     if mode == 'pywifes':
-        f1 = open(calib_fn, 'r')
-        calib_info = pickle.load(f1)
-        f1.close()
+
+        with open(calib_fn, 'rb') as f1:
+            calib_info = pickle.load(f1)
+
         sort_order = calib_info['wave'].argsort()
         calib_x = calib_info['wave'][sort_order]
         calib_y = calib_info['cal'][sort_order]
         # Fred's update 2 ... to account for the smooth method for B3000 ...
         # That's to fix the ugly of the previous function ...
-        this_f = scipy.interpolate.interp1d(
-            calib_x,calib_y,
-            bounds_error=False,fill_value=-100.0,
-            kind='linear')
+        this_f = scipy.interpolate.interp1d(calib_x, calib_y, bounds_error=False,
+                                            fill_value=-100.0, kind='linear')
         all_final_fvals = this_f(wave_array)
         inst_fcal_array = 10.0**(-0.4*all_final_fvals)
         #import pdb
         #pdb.set_trace()
+
     elif mode == 'iraf':
         f = pyfits.open(calib_fn)
         calib_wave = (
